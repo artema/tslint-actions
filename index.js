@@ -75,38 +75,58 @@ const SeverityAnnotationLevelMap = new Map([
         annotation_level: SeverityAnnotationLevelMap.get(failure.getRuleSeverity()) || "notice",
         message: `[${failure.getRuleName()}] ${failure.getFailure()}`,
     }));
-    // Update check
-    await octokit.checks.update({
-        owner: ctx.repo.owner,
-        repo: ctx.repo.repo,
-        check_run_id: check.data.id,
-        name: CHECK_NAME,
-        status: "completed",
-        conclusion: result.errorCount > 0 ? "failure" : "success",
-        output: {
-            title: CHECK_NAME,
-            summary: `${result.errorCount} error(s), ${result.warningCount} warning(s) found`,
-            text: common_tags_1.stripIndent `
-        ## Configuration
+    
+    await annotations
+    .reduce((res, item) => {
+        let group = res[res.length - 1];
+        
+        if (!group || group.length > 50) {
+            group = [];
+            res.push(group);
+        }
+        
+        group.push(item);
+        
+        return res;
+    }, [])
+    .reduce((task, group) => {
+        return task.then(async () => {
+            
+            // Update check
+            await octokit.checks.update({
+                owner: ctx.repo.owner,
+                repo: ctx.repo.repo,
+                check_run_id: check.data.id,
+                name: CHECK_NAME,
+                status: "completed",
+                conclusion: result.errorCount > 0 ? "failure" : "success",
+                output: {
+                    title: CHECK_NAME,
+                    summary: `${result.errorCount} error(s), ${result.warningCount} warning(s) found`,
+                    text: common_tags_1.stripIndent `
+                ## Configuration
 
-        #### Actions Input
+                #### Actions Input
 
-        | Name | Value |
-        | ---- | ----- |
-        | config | \`${configFileName}\` |
-        | project | \`${projectFileName || "(not provided)"}\` |
-        | pattern | \`${pattern || "(not provided)"}\` |
+                | Name | Value |
+                | ---- | ----- |
+                | config | \`${configFileName}\` |
+                | project | \`${projectFileName || "(not provided)"}\` |
+                | pattern | \`${pattern || "(not provided)"}\` |
 
-        #### TSLint Configuration
+                #### TSLint Configuration
 
-        \`\`\`json
-        __CONFIG_CONTENT__
-        \`\`\`
-        </details>
-      `.replace("__CONFIG_CONTENT__", JSON.stringify(tslint_1.Configuration.readConfigurationFile(configFileName), null, 2)),
-            annotations,
-        },
-    });
+                \`\`\`json
+                __CONFIG_CONTENT__
+                \`\`\`
+                </details>
+              `.replace("__CONFIG_CONTENT__", JSON.stringify(tslint_1.Configuration.readConfigurationFile(configFileName), null, 2)),
+                    group,
+                },
+            });
+        });
+    }, Promise.resolve());
+    
 })().catch((e) => {
     console.error(e.stack); // tslint:disable-line
     core.setFailed(e.message);
