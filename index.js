@@ -91,7 +91,7 @@ const SeverityAnnotationLevelMap = new Map([
     }, [])
     .reduce((task, group) => {
         return task.then(async () => {
-            
+            console.log(group);
             // Update check
             await octokit.checks.update({
                 owner: ctx.repo.owner,
