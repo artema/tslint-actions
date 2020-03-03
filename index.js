@@ -68,9 +68,7 @@ const SeverityAnnotationLevelMap = new Map([
     core.info(`Got ${annotations.length} linter failures.`);
     let relevantAnnotations = annotations;
     const pr = github_1.context.payload.pull_request;
-    pr.
-        if(pr);
-    {
+    if (pr) {
         try {
             const changedFiles = await getChangedFiles(octokit, pr.number, pr.changed_files);
             relevantAnnotations = annotations.filter((x) => changedFiles.indexOf(x.path) !== -1);

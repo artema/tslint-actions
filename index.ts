@@ -82,7 +82,7 @@ const SeverityAnnotationLevelMap = new Map<RuleSeverity, "warning" | "failure">(
   let relevantAnnotations: Octokit.ChecksCreateParamsOutputAnnotations[] = annotations;
 
   const pr = context.payload.pull_request;
-  pr.
+
   if (pr) {
     try {
       const changedFiles = await getChangedFiles(octokit, pr.number, pr.changed_files);
