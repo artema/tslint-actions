@@ -81,8 +81,6 @@ const SeverityAnnotationLevelMap = new Map([
     }
     const errorCount = relevantAnnotations.filter((x) => x.annotation_level === "failure").length;
     const warningCount = relevantAnnotations.filter((x) => x.annotation_level === "warning").length;
-    github_1.context.
-    ;
     const checkConclusion = errorCount > 0 ? "failure" : "success";
     const checkSummary = `${errorCount} error(s), ${warningCount} warning(s) found`;
     const checkText = common_tags_1.stripIndent `
