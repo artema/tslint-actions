@@ -3,7 +3,7 @@ import * as core from "@actions/core"; // tslint:disable-line
 const github = require("@actions/github"); // tslint:disable-line
 import { Context } from "@actions/github/lib/context";
 import * as Octokit from "@octokit/rest";
-import { stripIndent as markdown } from "common-tags";
+import { stripIndent as markdown, codeBlock } from "common-tags";
 import * as fs from "fs";
 import * as glob from "glob";
 import * as path from "path";
@@ -81,7 +81,7 @@ const SeverityAnnotationLevelMap = new Map<RuleSeverity, "warning" | "failure">(
     message: `[${failure.getRuleName()}] ${failure.getFailure()}`,
   }));
 
-  core.debug(`Got ${annotations.length} linter failures.`);
+  core.info(`Got ${annotations.length} linter failures.`);
 
   const pr = github.context.payload.pull_request;
 
@@ -92,9 +92,9 @@ const SeverityAnnotationLevelMap = new Map<RuleSeverity, "warning" | "failure">(
       const changedFiles = await getChangedFiles(octokit, pr.number, pr.changed_files);
       relevantAnnotations = annotations.filter(x => changedFiles.indexOf(x.path) !== -1);
 
-      core.debug(`Using only ${relevantAnnotations.length} annotations related to PR.`);
+      core.info(`Using only ${relevantAnnotations.length} annotations related to PR.`);
     } catch (error) {
-      console.error('getChangedFiles error', pr.number, pr.changed_files);
+      core.debug(`getChangedFiles error ${pr.number} ${pr.changed_files}`);
       throw error;
     }
   }
@@ -149,19 +149,23 @@ const SeverityAnnotationLevelMap = new Map<RuleSeverity, "warning" | "failure">(
       .reduce((task, group, i, list) => {
         return task.then(async () => {
           if (i === 0) {
-            core.debug(`Creating check run #${check.data.id} with ${group.length} annotations...`);
+            core.info(`Creating check run #${check.data.id} with ${group.length} annotations...`);
           } else {
-            core.debug(`Updating check run with ${group.length} annotations...`);
+            core.info(`Updating check run with ${group.length} annotations...`);
           }
 
+          group.forEach(x => core.debug(`${x.annotation_level} ${x.path}:${x.start_line} ${x.message}`));
+
           try {
+            const inProgress = i < list.length - 1 && list.length !== 1;
+
             await octokit.checks.update({
               owner: ctx.repo.owner,
               repo: ctx.repo.repo,
               check_run_id: check.data.id,
               name: CHECK_NAME,
-              status: i < list.length - 1 ? 'in_progress' :  'completed',
-              conclusion: checkConclusion,
+              status: inProgress ? 'in_progress' :  'completed',
+              conclusion: inProgress ? undefined : checkConclusion,
               output: {
                 title: CHECK_NAME,
                 summary: checkSummary,
@@ -170,7 +174,7 @@ const SeverityAnnotationLevelMap = new Map<RuleSeverity, "warning" | "failure">(
               },
             });
           } catch (error) {
-            console.error('update error', check.data.id, i);
+            core.debug(`update error: ${check.data.id} / ${i}`);
             throw error;
           }
         });
