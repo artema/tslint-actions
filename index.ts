@@ -152,7 +152,7 @@ const SeverityAnnotationLevelMap = new Map<RuleSeverity, "warning" | "failure">(
           name: i === 0 ? CHECK_NAME : undefined,
           status: i === 0 ? "completed" : undefined,
           conclusion: i === 0 ? checkConclusion : undefined,
-          method: i === 0 ? 'POST' : 'PATCH',
+          method: i === 0 ? 'PUT' : 'PATCH',
           output: {
             title: CHECK_NAME,
             summary: checkSummary,
