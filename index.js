@@ -71,9 +71,15 @@ const SeverityAnnotationLevelMap = new Map([
     const pr = github.context.payload.pull_request;
     let relevantAnnotations = annotations;
     if (pr) {
-        const changedFiles = await getChangedFiles(octokit, pr.number, pr.changed_files);
-        relevantAnnotations = annotations.filter(x => changedFiles.indexOf(x.path) !== -1);
-        core.debug(`Using only ${relevantAnnotations.length} annotations related to PR.`);
+        try {
+            const changedFiles = await getChangedFiles(octokit, pr.number, pr.changed_files);
+            relevantAnnotations = annotations.filter(x => changedFiles.indexOf(x.path) !== -1);
+            core.debug(`Using only ${relevantAnnotations.length} annotations related to PR.`);
+        }
+        catch (error) {
+            console.error('getChangedFiles error', pr.number, pr.changed_files);
+            throw error;
+        }
     }
     const checkConclusion = result.errorCount > 0 ? "failure" : "success";
     const checkSummary = `${result.errorCount} error(s), ${result.warningCount} warning(s) found`;
@@ -121,20 +127,26 @@ const SeverityAnnotationLevelMap = new Map([
             else {
                 core.debug(`Updating check run with ${group.length} annotations...`);
             }
-            await octokit.checks.update({
-                owner: ctx.repo.owner,
-                repo: ctx.repo.repo,
-                check_run_id: check.data.id,
-                name: CHECK_NAME,
-                status: "completed",
-                conclusion: checkConclusion,
-                output: {
-                    title: CHECK_NAME,
-                    summary: checkSummary,
-                    text: checkText,
-                    annotations: group,
-                },
-            });
+            try {
+                await octokit.checks.update({
+                    owner: ctx.repo.owner,
+                    repo: ctx.repo.repo,
+                    check_run_id: check.data.id,
+                    name: CHECK_NAME,
+                    status: "completed",
+                    conclusion: checkConclusion,
+                    output: {
+                        title: CHECK_NAME,
+                        summary: checkSummary,
+                        text: checkText,
+                        annotations: group,
+                    },
+                });
+            }
+            catch (error) {
+                console.error('update error', check.data.id, i);
+                throw error;
+            }
         });
     }, Promise.resolve());
 })().catch((e) => {
