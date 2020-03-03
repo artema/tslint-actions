@@ -97,7 +97,7 @@ const SeverityAnnotationLevelMap = new Map<RuleSeverity, "warning" | "failure">(
 
   const errorCount = relevantAnnotations.filter((x) => x.annotation_level === "failure").length;
   const warningCount = relevantAnnotations.filter((x) => x.annotation_level === "warning").length;
-
+  context.
   const checkConclusion = errorCount > 0 ? "failure" : "success";
   const checkSummary = `${errorCount} error(s), ${warningCount} warning(s) found`;
   const checkText = markdown`
@@ -118,6 +118,12 @@ const SeverityAnnotationLevelMap = new Map<RuleSeverity, "warning" | "failure">(
     \`\`\`
     </details>
   `.replace("__CONFIG_CONTENT__", JSON.stringify(Configuration.readConfigurationFile(configFileName), null, 2));
+  const lists = await octokit.checks.listForRef({
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    ref: context.sha,
+  });
+  console.log(lists);
 
   // Create check
   const check = await octokit.checks.create({
