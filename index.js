@@ -8,7 +8,7 @@ const fs = require("fs");
 const glob = require("glob");
 const path = require("path");
 const tslint_1 = require("tslint");
-const CHECK_NAME = "TSLint Checks";
+const CHECK_NAME = "TSLint";
 const SeverityAnnotationLevelMap = new Map([
     ["warning", "warning"],
     ["error", "failure"],
@@ -28,14 +28,6 @@ const SeverityAnnotationLevelMap = new Map([
         return;
     }
     const octokit = new github.GitHub(ghToken);
-    // Create check
-    const check = await octokit.checks.create({
-        owner: ctx.repo.owner,
-        repo: ctx.repo.repo,
-        name: CHECK_NAME,
-        head_sha: ctx.sha,
-        status: "in_progress",
-    });
     const options = {
         fix: false,
         formatter: "json",
@@ -103,6 +95,14 @@ const SeverityAnnotationLevelMap = new Map([
     \`\`\`
     </details>
   `.replace("__CONFIG_CONTENT__", JSON.stringify(tslint_1.Configuration.readConfigurationFile(configFileName), null, 2));
+    // Create check
+    const check = await octokit.checks.create({
+        owner: ctx.repo.owner,
+        repo: ctx.repo.repo,
+        name: CHECK_NAME,
+        head_sha: ctx.sha,
+        status: "in_progress",
+    });
     await relevantAnnotations
         .reduce((res, item) => {
         let group = res[res.length - 1];
@@ -125,10 +125,9 @@ const SeverityAnnotationLevelMap = new Map([
                 owner: ctx.repo.owner,
                 repo: ctx.repo.repo,
                 check_run_id: check.data.id,
-                name: i === 0 ? CHECK_NAME : undefined,
-                status: i === 0 ? "completed" : undefined,
-                conclusion: i === 0 ? checkConclusion : undefined,
-                method: i === 0 ? 'PUT' : 'PATCH',
+                name: CHECK_NAME,
+                status: "completed",
+                conclusion: checkConclusion,
                 output: {
                     title: CHECK_NAME,
                     summary: checkSummary,
