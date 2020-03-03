@@ -1,6 +1,6 @@
 {
   "name": "tslint-actions",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "GitHub action that lints your code with TSLint (with Annotation support)",
   "main": "index.js",
   "scripts": {
@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mooyoul/tslint-actions.git"
+    "url": "git+https://github.com/artema/tslint-actions.git"
   },
   "keywords": [
     "github-actions",

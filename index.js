@@ -75,61 +75,82 @@ const SeverityAnnotationLevelMap = new Map([
         annotation_level: SeverityAnnotationLevelMap.get(failure.getRuleSeverity()) || "notice",
         message: `[${failure.getRuleName()}] ${failure.getFailure()}`,
     }));
-    
-    await annotations
-    .reduce((res, item) => {
+    const pr = github.context.payload.pull_request;
+    let relevantAnnotations = annotations;
+    if (pr) {
+        const changedFiles = await getChangedFiles(octokit, pr.number, pr.changed_files);
+        console.log('changedFiles', changedFiles);
+        relevantAnnotations = annotations.filter(x => changedFiles.indexOf(x.path) !== -1);
+    }
+    console.log('relevantAnnotations', relevantAnnotations);
+    const checkConclusion = result.errorCount > 0 ? "failure" : "success";
+    const checkSummary = `${result.errorCount} error(s), ${result.warningCount} warning(s) found`;
+    const checkText = common_tags_1.stripIndent `
+    ## Configuration
+
+    #### Actions Input
+
+    | Name | Value |
+    | ---- | ----- |
+    | config | \`${configFileName}\` |
+    | project | \`${projectFileName || "(not provided)"}\` |
+    | pattern | \`${pattern || "(not provided)"}\` |
+
+    #### TSLint Configuration
+
+    \`\`\`json
+    __CONFIG_CONTENT__
+    \`\`\`
+    </details>
+  `.replace("__CONFIG_CONTENT__", JSON.stringify(tslint_1.Configuration.readConfigurationFile(configFileName), null, 2));
+    await relevantAnnotations
+        .reduce((res, item) => {
         let group = res[res.length - 1];
-        
         if (!group || group.length > 50) {
             group = [];
             res.push(group);
         }
-        
         group.push(item);
-        
         return res;
     }, [])
-    .reduce((task, group) => {
+        .reduce((task, group) => {
         return task.then(async () => {
-            console.log(group);
-            // Update check
-            const res = await octokit.checks.update({
+            await octokit.checks.update({
                 owner: ctx.repo.owner,
                 repo: ctx.repo.repo,
                 check_run_id: check.data.id,
                 name: CHECK_NAME,
                 status: "completed",
-                conclusion: result.errorCount > 0 ? "failure" : "success",
+                conclusion: checkConclusion,
+                method: 'PATCH',
                 output: {
                     title: CHECK_NAME,
-                    summary: `${result.errorCount} error(s), ${result.warningCount} warning(s) found`,
-                    text: common_tags_1.stripIndent `
-                ## Configuration
-
-                #### Actions Input
-
-                | Name | Value |
-                | ---- | ----- |
-                | config | \`${configFileName}\` |
-                | project | \`${projectFileName || "(not provided)"}\` |
-                | pattern | \`${pattern || "(not provided)"}\` |
-
-                #### TSLint Configuration
-
-                \`\`\`json
-                __CONFIG_CONTENT__
-                \`\`\`
-                </details>
-              `.replace("__CONFIG_CONTENT__", JSON.stringify(tslint_1.Configuration.readConfigurationFile(configFileName), null, 2)),
-                    group,
+                    summary: checkSummary,
+                    text: checkText,
+                    annotations: group,
                 },
             });
-            
-            console.log(res);
         });
     }, Promise.resolve());
-    
 })().catch((e) => {
     console.error(e.stack); // tslint:disable-line
     core.setFailed(e.message);
 });
+async function getChangedFiles(client, prNumber, fileCount) {
+    const perPage = 100;
+    let changedFiles = [];
+    for (let pageIndex = 0; pageIndex * perPage < fileCount; pageIndex++) {
+        const list = await client.pulls.listFiles({
+            owner: github.context.repo.owner,
+            repo: github.context.repo.repo,
+            pull_number: prNumber,
+            page: pageIndex,
+            per_page: perPage,
+        });
+        changedFiles = list.data.reduce((res, f) => {
+            changedFiles.push(f.filename);
+            return res;
+        }, changedFiles);
+    }
+    return changedFiles;
+}
