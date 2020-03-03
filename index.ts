@@ -90,19 +90,18 @@ const SeverityAnnotationLevelMap = new Map<RuleSeverity, "warning" | "failure">(
     message: `[${failure.getRuleName()}] ${failure.getFailure()}`,
   }));
 
+  core.debug(`Got ${annotations.length} linter failures.`);
+
   const pr = github.context.payload.pull_request;
 
-  let relevantAnnotations = annotations;
+  let relevantAnnotations:Octokit.ChecksCreateParamsOutputAnnotations[] = annotations;
 
   if (pr) {
     const changedFiles = await getChangedFiles(octokit, pr.number, pr.changed_files);
-
-    console.log('changedFiles', changedFiles);
-
     relevantAnnotations = annotations.filter(x => changedFiles.indexOf(x.path) !== -1);
-  }
 
-  console.log('relevantAnnotations', relevantAnnotations);
+    core.debug(`Using only ${relevantAnnotations.length} annotations related to PR.`);
+  }
 
   const checkConclusion = result.errorCount > 0 ? "failure" : "success";
   const checkSummary = `${result.errorCount} error(s), ${result.warningCount} warning(s) found`;
@@ -138,16 +137,22 @@ const SeverityAnnotationLevelMap = new Map<RuleSeverity, "warning" | "failure">(
         
         return res;
     }, [] as Octokit.ChecksCreateParamsOutputAnnotations[][])
-    .reduce((task, group) => {
+    .reduce((task, group, i) => {
       return task.then(async () => {
+        if (i === 0) {
+          core.debug(`Creating check run #${check.data.id} with ${group.length} annotations...`);
+        } else {
+          core.debug(`Updating check run with ${group.length} annotations...`);
+        }
+
         await octokit.checks.update({
           owner: ctx.repo.owner,
           repo: ctx.repo.repo,
           check_run_id: check.data.id,
-          name: CHECK_NAME,
-          status: "completed",
-          conclusion: checkConclusion,
-          method: 'PATCH',
+          name: i === 0 ? CHECK_NAME : undefined,
+          status: i === 0 ? "completed" : undefined,
+          conclusion: i === 0 ? checkConclusion : undefined,
+          method: i === 0 ? 'POST' : 'PATCH',
           output: {
             title: CHECK_NAME,
             summary: checkSummary,
