@@ -75,8 +75,8 @@ const SeverityAnnotationLevelMap = new Map<RuleSeverity, "warning" | "failure">(
 
   const annotations: Octokit.ChecksCreateParamsOutputAnnotations[] = result.failures.map((failure) => ({
     path: failure.getFileName(),
-    start_line: failure.getStartPosition().getLineAndCharacter().line,
-    end_line: failure.getEndPosition().getLineAndCharacter().line,
+    start_line: failure.getStartPosition().getLineAndCharacter().line + 1,
+    end_line: failure.getEndPosition().getLineAndCharacter().line + 1,
     annotation_level: SeverityAnnotationLevelMap.get(failure.getRuleSeverity()) || "notice",
     message: `[${failure.getRuleName()}] ${failure.getFailure()}`,
   }));
@@ -99,8 +99,11 @@ const SeverityAnnotationLevelMap = new Map<RuleSeverity, "warning" | "failure">(
     }
   }
 
-  const checkConclusion = result.errorCount > 0 ? "failure" : "success";
-  const checkSummary = `${result.errorCount} error(s), ${result.warningCount} warning(s) found`;
+  const errorCount = relevantAnnotations.filter(x => x.annotation_level === 'failure').length;
+  const warningCount = relevantAnnotations.filter(x => x.annotation_level === 'warning').length;
+
+  const checkConclusion = errorCount > 0 ? "failure" : "success";
+  const checkSummary = `${errorCount} error(s), ${warningCount} warning(s) found`;
   const checkText = markdown`
     ## Configuration
 
@@ -129,48 +132,67 @@ const SeverityAnnotationLevelMap = new Map<RuleSeverity, "warning" | "failure">(
     status: "in_progress",
   });
 
-  await relevantAnnotations
-    .reduce((res, item) => {
-        let group = res[res.length - 1];
-        
-        if (!group || group.length > 50) {
-            group = [];
-            res.push(group);
-        }
-        
-        group.push(item);
-        
-        return res;
-    }, [] as Octokit.ChecksCreateParamsOutputAnnotations[][])
-    .reduce((task, group, i) => {
-      return task.then(async () => {
-        if (i === 0) {
-          core.debug(`Creating check run #${check.data.id} with ${group.length} annotations...`);
-        } else {
-          core.debug(`Updating check run with ${group.length} annotations...`);
-        }
+  try {
+    await relevantAnnotations
+      .reduce((res, item) => {
+          let group = res[res.length - 1];
+          
+          if (!group || group.length > 50) {
+              group = [];
+              res.push(group);
+          }
+          
+          group.push(item);
+          
+          return res;
+      }, [] as Octokit.ChecksCreateParamsOutputAnnotations[][])
+      .reduce((task, group, i, list) => {
+        return task.then(async () => {
+          if (i === 0) {
+            core.debug(`Creating check run #${check.data.id} with ${group.length} annotations...`);
+          } else {
+            core.debug(`Updating check run with ${group.length} annotations...`);
+          }
 
-        try {
-          await octokit.checks.update({
-            owner: ctx.repo.owner,
-            repo: ctx.repo.repo,
-            check_run_id: check.data.id,
-            name: CHECK_NAME,
-            status: "completed",
-            conclusion: checkConclusion,
-            output: {
-              title: CHECK_NAME,
-              summary: checkSummary,
-              text: checkText,
-              annotations: group,
-            },
-          });
-        } catch (error) {
-          console.error('update error', check.data.id, i);
-          throw error;
-        }
-      });
-    }, Promise.resolve());
+          try {
+            await octokit.checks.update({
+              owner: ctx.repo.owner,
+              repo: ctx.repo.repo,
+              check_run_id: check.data.id,
+              name: CHECK_NAME,
+              status: i < list.length - 1 ? 'in_progress' :  'completed',
+              conclusion: checkConclusion,
+              output: {
+                title: CHECK_NAME,
+                summary: checkSummary,
+                text: checkText,
+                annotations: group,
+              },
+            });
+          } catch (error) {
+            console.error('update error', check.data.id, i);
+            throw error;
+          }
+        });
+      }, Promise.resolve());
+  } catch (error) {
+    await octokit.checks.update({
+      owner: ctx.repo.owner,
+      repo: ctx.repo.repo,
+      check_run_id: check.data.id,
+      name: CHECK_NAME,
+      status: 'completed',
+      conclusion: checkConclusion,
+      output: {
+        title: CHECK_NAME,
+        summary: checkSummary,
+        text: checkText,
+        annotations: [],
+      },
+    });
+
+    throw error;
+  }
 })().catch((e) => {
   console.error(e.stack); // tslint:disable-line
   core.setFailed(e.message);
