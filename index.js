@@ -101,18 +101,14 @@ const SeverityAnnotationLevelMap = new Map([
     \`\`\`
     </details>
   `.replace("__CONFIG_CONTENT__", JSON.stringify(tslint_1.Configuration.readConfigurationFile(configFileName), null, 2));
-    const lists = await octokit.checks.listForRef({
+    const checksData = await octokit.checks.listForRef({
         owner: github_1.context.repo.owner,
         repo: github_1.context.repo.repo,
         ref: github_1.context.sha,
     });
-    console.log(github_1.context.sha, lists.data.check_runs);
-    const lists2 = await octokit.checks.listForRef({
-        owner: github_1.context.repo.owner,
-        repo: github_1.context.repo.repo,
-        ref: github_1.context.ref,
-    });
-    console.log(github_1.context.ref, lists2.data.check_runs);
+    console.log('Context', github_1.context);
+    console.log('check_runs', checksData.data.check_runs);
+    const currentCheck = checksData.data.check_runs.find((x) => x.status === "in_progress");
     // Create check
     const check = await octokit.checks.create({
         owner: github_1.context.repo.owner,
