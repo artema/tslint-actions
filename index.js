@@ -109,7 +109,14 @@ const SeverityAnnotationLevelMap = new Map([
         repo: ctx.repo.repo,
         name: CHECK_NAME,
         head_sha: ctx.sha,
-        status: "in_progress",
+        conclusion: relevantAnnotations.length > 0 ? undefined : checkConclusion,
+        status: relevantAnnotations.length > 0 ? 'in_progress' : 'completed',
+        output: relevantAnnotations.length > 0 ? undefined : {
+            title: CHECK_NAME,
+            summary: checkSummary,
+            text: checkText,
+            annotations: [],
+        },
     });
     try {
         await relevantAnnotations
@@ -162,7 +169,7 @@ const SeverityAnnotationLevelMap = new Map([
             check_run_id: check.data.id,
             name: CHECK_NAME,
             status: 'completed',
-            conclusion: checkConclusion,
+            conclusion: 'failure',
             output: {
                 title: CHECK_NAME,
                 summary: checkSummary,
