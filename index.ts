@@ -123,8 +123,14 @@ const SeverityAnnotationLevelMap = new Map<RuleSeverity, "warning" | "failure">(
     repo: context.repo.repo,
     ref: context.sha,
   });
+  const checksData2 = await octokit.checks.listForRef({
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    ref: context.ref,
+  });
   console.log('Context', context);
   console.log('check_runs', checksData.data.check_runs);
+  console.log('check_runs2', checksData2.data.check_runs);
   const currentCheck = checksData.data.check_runs.find((x) => x.status === "in_progress");
 
   // Create check

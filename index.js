@@ -106,8 +106,14 @@ const SeverityAnnotationLevelMap = new Map([
         repo: github_1.context.repo.repo,
         ref: github_1.context.sha,
     });
+    const checksData2 = await octokit.checks.listForRef({
+        owner: github_1.context.repo.owner,
+        repo: github_1.context.repo.repo,
+        ref: github_1.context.ref,
+    });
     console.log('Context', github_1.context);
     console.log('check_runs', checksData.data.check_runs);
+    console.log('check_runs2', checksData2.data.check_runs);
     const currentCheck = checksData.data.check_runs.find((x) => x.status === "in_progress");
     // Create check
     const check = await octokit.checks.create({
