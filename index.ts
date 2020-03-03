@@ -82,7 +82,7 @@ const SeverityAnnotationLevelMap = new Map<RuleSeverity, "warning" | "failure">(
   let relevantAnnotations: Octokit.ChecksCreateParamsOutputAnnotations[] = annotations;
 
   const pr = context.payload.pull_request;
-
+  pr.
   if (pr) {
     try {
       const changedFiles = await getChangedFiles(octokit, pr.number, pr.changed_files);
@@ -123,7 +123,14 @@ const SeverityAnnotationLevelMap = new Map<RuleSeverity, "warning" | "failure">(
     repo: context.repo.repo,
     ref: context.sha,
   });
-  console.log(lists.data.check_runs);
+  console.log(context.sha, lists.data.check_runs);
+
+  const lists2 = await octokit.checks.listForRef({
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    ref: context.ref,
+  });
+  console.log(context.ref, lists2.data.check_runs);
 
   // Create check
   const check = await octokit.checks.create({

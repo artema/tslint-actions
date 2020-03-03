@@ -68,7 +68,9 @@ const SeverityAnnotationLevelMap = new Map([
     core.info(`Got ${annotations.length} linter failures.`);
     let relevantAnnotations = annotations;
     const pr = github_1.context.payload.pull_request;
-    if (pr) {
+    pr.
+        if(pr);
+    {
         try {
             const changedFiles = await getChangedFiles(octokit, pr.number, pr.changed_files);
             relevantAnnotations = annotations.filter((x) => changedFiles.indexOf(x.path) !== -1);
@@ -106,7 +108,13 @@ const SeverityAnnotationLevelMap = new Map([
         repo: github_1.context.repo.repo,
         ref: github_1.context.sha,
     });
-    console.log(lists.data.check_runs);
+    console.log(github_1.context.sha, lists.data.check_runs);
+    const lists2 = await octokit.checks.listForRef({
+        owner: github_1.context.repo.owner,
+        repo: github_1.context.repo.repo,
+        ref: github_1.context.ref,
+    });
+    console.log(github_1.context.ref, lists2.data.check_runs);
     // Create check
     const check = await octokit.checks.create({
         owner: github_1.context.repo.owner,
