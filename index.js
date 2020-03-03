@@ -1,8 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const core = require("@actions/core"); // tslint:disable-line
-// Currently @actions/github cannot be loaded via import statement due to typing error
-const github = require("@actions/github"); // tslint:disable-line
+const github_1 = require("@actions/github");
 const common_tags_1 = require("common-tags");
 const fs = require("fs");
 const glob = require("glob");
@@ -14,7 +13,6 @@ const SeverityAnnotationLevelMap = new Map([
     ["error", "failure"],
 ]);
 (async () => {
-    const ctx = github.context;
     const configFileName = core.getInput("config") || "tslint.json";
     const projectFileName = core.getInput("project");
     const pattern = core.getInput("pattern");
@@ -27,7 +25,7 @@ const SeverityAnnotationLevelMap = new Map([
         core.setFailed("tslint-actions: Please set token");
         return;
     }
-    const octokit = new github.GitHub(ghToken);
+    const octokit = new github_1.GitHub(ghToken);
     const options = {
         fix: false,
         formatter: "json",
@@ -68,12 +66,12 @@ const SeverityAnnotationLevelMap = new Map([
         message: `[${failure.getRuleName()}] ${failure.getFailure()}`,
     }));
     core.info(`Got ${annotations.length} linter failures.`);
-    const pr = github.context.payload.pull_request;
     let relevantAnnotations = annotations;
+    const pr = github_1.context.payload.pull_request;
     if (pr) {
         try {
             const changedFiles = await getChangedFiles(octokit, pr.number, pr.changed_files);
-            relevantAnnotations = annotations.filter(x => changedFiles.indexOf(x.path) !== -1);
+            relevantAnnotations = annotations.filter((x) => changedFiles.indexOf(x.path) !== -1);
             core.info(`Using only ${relevantAnnotations.length} annotations related to PR.`);
         }
         catch (error) {
@@ -81,8 +79,8 @@ const SeverityAnnotationLevelMap = new Map([
             throw error;
         }
     }
-    const errorCount = relevantAnnotations.filter(x => x.annotation_level === 'failure').length;
-    const warningCount = relevantAnnotations.filter(x => x.annotation_level === 'warning').length;
+    const errorCount = relevantAnnotations.filter((x) => x.annotation_level === "failure").length;
+    const warningCount = relevantAnnotations.filter((x) => x.annotation_level === "warning").length;
     const checkConclusion = errorCount > 0 ? "failure" : "success";
     const checkSummary = `${errorCount} error(s), ${warningCount} warning(s) found`;
     const checkText = common_tags_1.stripIndent `
@@ -105,12 +103,12 @@ const SeverityAnnotationLevelMap = new Map([
   `.replace("__CONFIG_CONTENT__", JSON.stringify(tslint_1.Configuration.readConfigurationFile(configFileName), null, 2));
     // Create check
     const check = await octokit.checks.create({
-        owner: ctx.repo.owner,
-        repo: ctx.repo.repo,
+        owner: github_1.context.repo.owner,
+        repo: github_1.context.repo.repo,
         name: CHECK_NAME,
-        head_sha: ctx.sha,
+        head_sha: github_1.context.sha,
         conclusion: relevantAnnotations.length > 0 ? undefined : checkConclusion,
-        status: relevantAnnotations.length > 0 ? 'in_progress' : 'completed',
+        status: relevantAnnotations.length > 0 ? "in_progress" : "completed",
         output: relevantAnnotations.length > 0 ? undefined : {
             title: CHECK_NAME,
             summary: checkSummary,
@@ -137,15 +135,15 @@ const SeverityAnnotationLevelMap = new Map([
                 else {
                     core.info(`Updating check run with ${group.length} annotations...`);
                 }
-                group.forEach(x => core.debug(`${x.annotation_level} ${x.path}:${x.start_line} ${x.message}`));
+                group.forEach((x) => core.debug(`${x.annotation_level} ${x.path}:${x.start_line} ${x.message}`));
                 try {
                     const inProgress = i < list.length - 1 && list.length !== 1;
                     await octokit.checks.update({
-                        owner: ctx.repo.owner,
-                        repo: ctx.repo.repo,
+                        owner: github_1.context.repo.owner,
+                        repo: github_1.context.repo.repo,
                         check_run_id: check.data.id,
                         name: CHECK_NAME,
-                        status: inProgress ? 'in_progress' : 'completed',
+                        status: inProgress ? "in_progress" : "completed",
                         conclusion: inProgress ? undefined : checkConclusion,
                         output: {
                             title: CHECK_NAME,
@@ -164,12 +162,12 @@ const SeverityAnnotationLevelMap = new Map([
     }
     catch (error) {
         await octokit.checks.update({
-            owner: ctx.repo.owner,
-            repo: ctx.repo.repo,
+            owner: github_1.context.repo.owner,
+            repo: github_1.context.repo.repo,
             check_run_id: check.data.id,
             name: CHECK_NAME,
-            status: 'completed',
-            conclusion: 'failure',
+            status: "completed",
+            conclusion: "failure",
             output: {
                 title: CHECK_NAME,
                 summary: checkSummary,
@@ -188,8 +186,8 @@ async function getChangedFiles(client, prNumber, fileCount) {
     let changedFiles = [];
     for (let pageIndex = 0; pageIndex * perPage < fileCount; pageIndex++) {
         const list = await client.pulls.listFiles({
-            owner: github.context.repo.owner,
-            repo: github.context.repo.repo,
+            owner: github_1.context.repo.owner,
+            repo: github_1.context.repo.repo,
             pull_number: prNumber,
             page: pageIndex,
             per_page: perPage,

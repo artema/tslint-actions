@@ -1,9 +1,7 @@
 import * as core from "@actions/core"; // tslint:disable-line
-// Currently @actions/github cannot be loaded via import statement due to typing error
-const github = require("@actions/github"); // tslint:disable-line
-import { Context } from "@actions/github/lib/context";
-import * as Octokit from "@octokit/rest";
-import { stripIndent as markdown, codeBlock } from "common-tags";
+import { context, GitHub } from "@actions/github";
+import { Octokit } from "@octokit/rest";
+import { stripIndent as markdown } from "common-tags";
 import * as fs from "fs";
 import * as glob from "glob";
 import * as path from "path";
@@ -17,8 +15,6 @@ const SeverityAnnotationLevelMap = new Map<RuleSeverity, "warning" | "failure">(
 ]);
 
 (async () => {
-  const ctx = github.context as Context;
-
   const configFileName = core.getInput("config") || "tslint.json";
   const projectFileName = core.getInput("project");
   const pattern = core.getInput("pattern");
@@ -34,7 +30,7 @@ const SeverityAnnotationLevelMap = new Map<RuleSeverity, "warning" | "failure">(
     return;
   }
 
-  const octokit = new github.GitHub(ghToken) as Octokit;
+  const octokit = new GitHub(ghToken);
 
   const options = {
     fix: false,
@@ -83,14 +79,14 @@ const SeverityAnnotationLevelMap = new Map<RuleSeverity, "warning" | "failure">(
 
   core.info(`Got ${annotations.length} linter failures.`);
 
-  const pr = github.context.payload.pull_request;
+  let relevantAnnotations: Octokit.ChecksCreateParamsOutputAnnotations[] = annotations;
 
-  let relevantAnnotations:Octokit.ChecksCreateParamsOutputAnnotations[] = annotations;
+  const pr = context.payload.pull_request;
 
   if (pr) {
     try {
       const changedFiles = await getChangedFiles(octokit, pr.number, pr.changed_files);
-      relevantAnnotations = annotations.filter(x => changedFiles.indexOf(x.path) !== -1);
+      relevantAnnotations = annotations.filter((x) => changedFiles.indexOf(x.path) !== -1);
 
       core.info(`Using only ${relevantAnnotations.length} annotations related to PR.`);
     } catch (error) {
@@ -99,8 +95,8 @@ const SeverityAnnotationLevelMap = new Map<RuleSeverity, "warning" | "failure">(
     }
   }
 
-  const errorCount = relevantAnnotations.filter(x => x.annotation_level === 'failure').length;
-  const warningCount = relevantAnnotations.filter(x => x.annotation_level === 'warning').length;
+  const errorCount = relevantAnnotations.filter((x) => x.annotation_level === "failure").length;
+  const warningCount = relevantAnnotations.filter((x) => x.annotation_level === "warning").length;
 
   const checkConclusion = errorCount > 0 ? "failure" : "success";
   const checkSummary = `${errorCount} error(s), ${warningCount} warning(s) found`;
@@ -125,12 +121,12 @@ const SeverityAnnotationLevelMap = new Map<RuleSeverity, "warning" | "failure">(
 
   // Create check
   const check = await octokit.checks.create({
-    owner: ctx.repo.owner,
-    repo: ctx.repo.repo,
+    owner: context.repo.owner,
+    repo: context.repo.repo,
     name: CHECK_NAME,
-    head_sha: ctx.sha,
+    head_sha: context.sha,
     conclusion: relevantAnnotations.length > 0 ? undefined : checkConclusion,
-    status: relevantAnnotations.length > 0 ? 'in_progress' : 'completed',
+    status: relevantAnnotations.length > 0 ? "in_progress" : "completed",
     output: relevantAnnotations.length > 0 ? undefined : {
       title: CHECK_NAME,
       summary: checkSummary,
@@ -143,14 +139,14 @@ const SeverityAnnotationLevelMap = new Map<RuleSeverity, "warning" | "failure">(
     await relevantAnnotations
       .reduce((res, item) => {
           let group = res[res.length - 1];
-          
+
           if (!group || group.length > 50) {
               group = [];
               res.push(group);
           }
-          
+
           group.push(item);
-          
+
           return res;
       }, [] as Octokit.ChecksCreateParamsOutputAnnotations[][])
       .reduce((task, group, i, list) => {
@@ -161,17 +157,17 @@ const SeverityAnnotationLevelMap = new Map<RuleSeverity, "warning" | "failure">(
             core.info(`Updating check run with ${group.length} annotations...`);
           }
 
-          group.forEach(x => core.debug(`${x.annotation_level} ${x.path}:${x.start_line} ${x.message}`));
+          group.forEach((x) => core.debug(`${x.annotation_level} ${x.path}:${x.start_line} ${x.message}`));
 
           try {
             const inProgress = i < list.length - 1 && list.length !== 1;
 
             await octokit.checks.update({
-              owner: ctx.repo.owner,
-              repo: ctx.repo.repo,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
               check_run_id: check.data.id,
               name: CHECK_NAME,
-              status: inProgress ? 'in_progress' :  'completed',
+              status: inProgress ? "in_progress" :  "completed",
               conclusion: inProgress ? undefined : checkConclusion,
               output: {
                 title: CHECK_NAME,
@@ -188,12 +184,12 @@ const SeverityAnnotationLevelMap = new Map<RuleSeverity, "warning" | "failure">(
       }, Promise.resolve());
   } catch (error) {
     await octokit.checks.update({
-      owner: ctx.repo.owner,
-      repo: ctx.repo.repo,
+      owner: context.repo.owner,
+      repo: context.repo.repo,
       check_run_id: check.data.id,
       name: CHECK_NAME,
-      status: 'completed',
-      conclusion: 'failure',
+      status: "completed",
+      conclusion: "failure",
       output: {
         title: CHECK_NAME,
         summary: checkSummary,
@@ -209,18 +205,18 @@ const SeverityAnnotationLevelMap = new Map<RuleSeverity, "warning" | "failure">(
   core.setFailed(e.message);
 });
 
-async function getChangedFiles(client:Octokit, prNumber:number, fileCount:number):Promise<string[]> {
+async function getChangedFiles(client: GitHub, prNumber: number, fileCount: number): Promise<string[]> {
   const perPage = 100;
-  let changedFiles:string[] = [];
+  let changedFiles: string[] = [];
 
   for (let pageIndex = 0; pageIndex * perPage < fileCount; pageIndex++) {
     const list = await client.pulls.listFiles({
-      owner: github.context.repo.owner,
-      repo: github.context.repo.repo,
+      owner: context.repo.owner,
+      repo: context.repo.repo,
       pull_number: prNumber,
       page: pageIndex,
       per_page: perPage,
-    })
+    });
 
     changedFiles = list.data.reduce((res, f) => {
       changedFiles.push(f.filename);
@@ -229,10 +225,4 @@ async function getChangedFiles(client:Octokit, prNumber:number, fileCount:number
   }
 
   return changedFiles;
-}
-
-interface IChangedFiles {
-  created:string[];
-  updated:string[];
-  deleted:string[];
 }
